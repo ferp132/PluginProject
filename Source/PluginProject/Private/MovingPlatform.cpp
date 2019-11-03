@@ -16,21 +16,6 @@ AMovingPlatform::AMovingPlatform()
 
 	Spline = CreateDefaultSubobject<USplineComponent>(TEXT("Spline"));
 	Spline->SetupAttachment(PlatformMesh);
-
-	if (ensure(Spline))
-	{
-		for (int i = 0; i < Spline->GetNumberOfSplinePoints(); i++)
-		{
-			//Spawn a new one with a name based on the current waypoint in this loop
-			UStaticMeshComponent* NewMesh = CreateDefaultSubobject<UStaticMeshComponent>(*FString("Waypoint Mesh " + FString::FromInt(i)));
-
-			NewMesh->SetWorldTransform(Spline->GetTransformAtSplinePoint(i, ESplineCoordinateSpace::World));
-			NewMesh->SetupAttachment(PlatformMesh);
-
-			//Add it to the array of waypoint meshes
-			WaypointMeshArray.Add(NewMesh);
-		}
-	}
 }
 
 // Called when the game starts or when spawned
@@ -40,46 +25,187 @@ void AMovingPlatform::BeginPlay()
 	
 }
 
+void AMovingPlatform::CheckWaypointMesh(int ArrayIndex)
+{
+	if (!ensure(PlatformMesh)) return;
+
+	UStaticMesh* WaypointMesh = WaypointMeshArray[ArrayIndex]->GetStaticMesh();
+	UMaterial* WaypointMaterial = WaypointMeshArray[ArrayIndex]->GetMaterial(0)->GetMaterial();
+
+
+	UMaterial* MainMaterial = PlatformMesh->GetMaterial(0)->GetMaterial();
+	UStaticMesh* MainMesh = PlatformMesh->GetStaticMesh();
+
+	//If the user has set a custom mesh for all the waypoints
+	if (CustomWaypointMesh != nullptr)
+	{
+		if (WaypointMesh != CustomWaypointMesh)
+			WaypointMeshArray[ArrayIndex]->SetStaticMesh(CustomWaypointMesh);
+	}
+	else if (WaypointMesh != MainMesh)
+		WaypointMeshArray[ArrayIndex]->SetStaticMesh(MainMesh);
+
+	if (ensure(CustomWaypointMaterial))
+	{
+		if (WaypointMaterial != CustomWaypointMaterial)
+		{
+			WaypointMeshArray[ArrayIndex]->SetMaterial(0, CustomWaypointMaterial);
+		}
+	}
+	else
+	{
+		if (WaypointMaterial != MainMaterial)
+		{
+			WaypointMeshArray[ArrayIndex]->SetMaterial(0, MainMaterial);
+		}
+	}
+
+}
+
+void AMovingPlatform::CheckWaypointLocation(int ArrayIndex)
+{
+	FVector SplinepointLocation = Spline->GetLocationAtSplinePoint(ArrayIndex, ESplineCoordinateSpace::World);
+	FVector MeshLocation = WaypointMeshArray[ArrayIndex]->GetComponentLocation();
+
+	if (MeshLocation != SplinepointLocation)
+	{
+		WaypointMeshArray[ArrayIndex]->SetWorldLocation(SplinepointLocation);
+	}
+}
+
+void AMovingPlatform::CheckWaypointRotation(int ArrayIndex)
+{
+	FRotator SplinepointRotation = Spline->GetRotationAtSplinePoint(ArrayIndex, ESplineCoordinateSpace::World);
+	FRotator MeshRotation = WaypointMeshArray[ArrayIndex]->GetComponentRotation();
+
+	if (MeshRotation != SplinepointRotation)
+	{
+		WaypointMeshArray[ArrayIndex]->SetWorldRotation(SplinepointRotation);
+	}
+}
+
+void AMovingPlatform::CheckWaypointTransform(int ArrayIndex)
+{
+	if (bUseWaypointLocation) CheckWaypointLocation(ArrayIndex);
+	if (bUseWaypointRotation) CheckWaypointRotation(ArrayIndex);
+}
+
+void AMovingPlatform::UpdateWaypointArray()
+{
+	int AmountSplinepoints = Spline->GetNumberOfSplinePoints();
+	int AmountWaypoints = WaypointMeshArray.Num();
+
+	if (AmountSplinepoints > AmountWaypoints)
+	{
+		for (int i = 0; i < AmountSplinepoints - AmountWaypoints; i++)
+		{
+			CreateNewWaypoint();
+		}
+	}
+	else if (AmountWaypoints > AmountSplinepoints)
+	{
+		for (int i = 0; i < AmountWaypoints - AmountSplinepoints; i++)
+		{
+			DestroyWaypoint(i);
+		}
+	}
+}
+
+void AMovingPlatform::CreateNewWaypoint()
+{
+	// create the static mesh component
+	UStaticMeshComponent* mesh = NewObject<UStaticMeshComponent>(this);
+	mesh->AttachTo(RootComponent);
+	mesh->RegisterComponent();
+
+	UMaterial* MainMaterial = PlatformMesh->GetMaterial(0)->GetMaterial();
+	UStaticMesh* MainMesh = PlatformMesh->GetStaticMesh();
+
+	mesh->SetStaticMesh(MainMesh);
+	mesh->SetMaterial(0, MainMaterial);
+
+	if (ensure(mesh))
+	{
+		WaypointMeshArray.Add(mesh);
+		UE_LOG(LogTemp, Warning, TEXT("New Waypoint Created"));
+	}
+	else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("New Waypoint Creation Failed"));
+	}
+}
+
+void AMovingPlatform::DestroyWaypoint(int ArrayIndex)
+{
+	UE_LOG(LogTemp, Warning, TEXT("Waypoint Destroyed"));
+	UStaticMeshComponent* MeshToRemove = WaypointMeshArray[ArrayIndex];
+	WaypointMeshArray.RemoveAt(ArrayIndex);
+	MeshToRemove->DestroyComponent();
+}
+
+void AMovingPlatform::UpdatePlatformTransform()
+{
+	UpdatePlatformLocation();
+	if (bUseWaypointRotation) UpdatePlatformRotation();
+}
+
+void AMovingPlatform::UpdatePlatformLocation()
+{
+	FVector NextLocation = Spline->GetLocationAtDistanceAlongSpline(DistanceTravelled, ESplineCoordinateSpace::World);
+
+	PlatformMesh->SetWorldLocation(NextLocation);
+}
+
+void AMovingPlatform::UpdatePlatformRotation()
+{
+	FRotator NextRotation = Spline->GetRotationAtDistanceAlongSpline(DistanceTravelled, ESplineCoordinateSpace::World);
+
+	PlatformMesh->SetWorldRotation(NextRotation);
+}
+
+void AMovingPlatform::OnConstruction(const FTransform& Transform)
+{
+	UE_LOG(LogTemp, Warning, TEXT("%d"), WaypointMeshArray.Num());
+	if (ensure(Spline))
+	{
+		UpdateWaypointArray();
+
+		if (ensure(PlatformMesh))
+		{
+			//Loop through Each waypointmesh
+			for (int i = 0; i < WaypointMeshArray.Num(); i++)
+			{
+				CheckWaypointMesh(i);
+				CheckWaypointTransform(i);
+			}
+		}
+	}
+}
+
+
 // Called every frame
 void AMovingPlatform::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-}
+	DistanceTravelled += DeltaTime * PlatformSpeed;
 
-void AMovingPlatform::OnConstruction(const FTransform& Transform)
-{
-	if (ensure(Spline))
+	if(DistanceTravelled >= Spline->GetDistanceAlongSplineAtSplinePoint(CurrentPoint))
 	{
-		for (int i = 0; i < Spline->GetNumberOfSplinePoints(); i++)
-		{
-				//If there isnt a mesh for this spline point
-				if (WaypointMeshArray.Num() == i - 1)
-				{
+		CurrentPoint++;
 
-				}
+		if (CurrentPoint > Spline->GetNumberOfSplinePoints())
+		{
+			CurrentPoint = 0;
+			DistanceTravelled = 0;
 		}
+	}
+	else
+	{
+		UpdatePlatformTransform();
 	}
 
 
-	//Loop through Each Waypoint And chech that it's stacmesh is equal to the main meshes
-	if (ensure(PlatformMesh))
-	{
-		for (int i = 0; i < WaypointMeshArray.Num(); i++)
-		{
-			if (CustomWaypointMesh != nullptr)
-			{
-				if (WaypointMeshArray[i]->GetStaticMesh() != CustomWaypointMesh)
-					WaypointMeshArray[i]->SetStaticMesh(CustomWaypointMesh);
-			}
-			else if (WaypointMeshArray[i]->GetStaticMesh() != PlatformMesh->GetStaticMesh())
-				WaypointMeshArray[i]->SetStaticMesh(PlatformMesh->GetStaticMesh());
 
-			if (WaypointMeshArray[i]->GetComponentLocation() != Spline->GetTransformAtSplinePoint(i, ESplineCoordinateSpace::World).GetLocation())
-			{
-				WaypointMeshArray[i]->SetWorldLocation(Spline->GetTransformAtSplinePoint(i, ESplineCoordinateSpace::World).GetLocation());
-			}
-		}
-	}
+
 }
-

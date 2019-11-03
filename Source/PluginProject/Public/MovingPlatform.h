@@ -27,11 +27,36 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Components")
 		int CurrentPoint = 0;
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Components")
+		float DistanceTravelled = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Components")
+		float PlatformSpeed = 100.f;
+
 
 	UPROPERTY(VisibleAnywhere, Category = "Waypoints")
 		TArray<UStaticMeshComponent*> WaypointMeshArray;
 
+	void CheckWaypointMesh(int ArrayIndex);
+	void CheckWaypointLocation(int ArrayIndex);
+	void CheckWaypointRotation(int ArrayIndex);
+	void CheckWaypointTransform(int ArrayIndex);
+
+
+	void UpdateWaypointArray();
+	void CreateNewWaypoint();
+	void DestroyWaypoint(int ArrayIndex);
+
+	void UpdatePlatformTransform();
+	void UpdatePlatformLocation();
+	void UpdatePlatformRotation();
+
 public:	
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Waypoints")
+		bool bUseWaypointLocation = true;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Waypoints")
+		bool bUseWaypointRotation = true;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Components")
 		UStaticMeshComponent* PlatformMesh = nullptr;
