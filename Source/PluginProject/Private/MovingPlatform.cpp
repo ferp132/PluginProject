@@ -106,6 +106,8 @@ void AMovingPlatform::CheckWaypointTransform(int ArrayIndex)
 {
 	if (bUseWaypointLocation) CheckWaypointLocation(ArrayIndex);
 	if (bUseWaypointRotation) CheckWaypointRotation(ArrayIndex);
+	WaypointMeshArray[ArrayIndex]->SetWorldScale3D(PlatformMesh->GetComponentScale());
+
 }
 
 void AMovingPlatform::UpdateWaypointArray()
@@ -182,7 +184,6 @@ void AMovingPlatform::UpdatePlatformRotation()
 
 void AMovingPlatform::OnConstruction(const FTransform& Transform)
 {
-	UE_LOG(LogTemp, Warning, TEXT("%d"), WaypointMeshArray.Num());
 	if (ensure(Spline))
 	{
 		UpdateWaypointArray();
@@ -194,6 +195,20 @@ void AMovingPlatform::OnConstruction(const FTransform& Transform)
 			{
 				CheckWaypointMesh(i);
 				CheckWaypointTransform(i);
+			}
+		}
+	}
+
+	if (WaypointMeshArray.Num() >= CurrentPoint)
+	{
+
+		if (ensure(WaypointMeshArray[CurrentPoint]))
+		{
+
+			if (ensure(PlatformMesh))
+			{
+				PlatformMesh->SetWorldLocation(WaypointMeshArray[CurrentPoint]->GetComponentLocation());
+				PlatformMesh->SetWorldRotation(WaypointMeshArray[CurrentPoint]->GetComponentRotation());
 			}
 		}
 	}
