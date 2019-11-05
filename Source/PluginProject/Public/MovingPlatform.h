@@ -27,11 +27,15 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Components")
 		int CurrentPoint = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Components")
+		int StartPoint = 0;
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Components")
 		float DistanceTravelled = 0;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Components")
-		float PlatformSpeed = 100.f;
+		float PlatformSpeed = 1000.f;
 
 
 	UPROPERTY(VisibleAnywhere, Category = "Waypoints")
@@ -51,7 +55,8 @@ protected:
 	void UpdatePlatformLocation();
 	void UpdatePlatformRotation();
 
-	void SetCurrentPoint(int newPoint);
+	void ValidateStartPoint();
+	void UpdatePlatformStartPosition();
 
 public:	
 

@@ -15,10 +15,12 @@ AMovingPlatform::AMovingPlatform()
 	Spline = CreateDefaultSubobject<USplineComponent>(TEXT("Spline"));
 	SetRootComponent(Spline);
 
-
 	PlatformMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Platform Mesh"));
+	PlatformMesh->SetupAttachment(Spline);
 
 	WaypointMeshArray.Empty();
+
+	CurrentPoint = StartPoint;
 }
 
 // Called when the game starts or when spawned
@@ -26,6 +28,7 @@ void AMovingPlatform::BeginPlay()
 {
 	Super::BeginPlay();
 	
+	CurrentPoint = StartPoint;
 }
 
 void AMovingPlatform::CheckWaypointMesh(int ArrayIndex)
@@ -106,7 +109,12 @@ void AMovingPlatform::CheckWaypointTransform(int ArrayIndex)
 {
 	if (bUseWaypointLocation) CheckWaypointLocation(ArrayIndex);
 	if (bUseWaypointRotation) CheckWaypointRotation(ArrayIndex);
-	WaypointMeshArray[ArrayIndex]->SetWorldScale3D(PlatformMesh->GetComponentScale());
+	else
+	{
+		if (ensure(WaypointMeshArray[ArrayIndex])) WaypointMeshArray[ArrayIndex]->SetWorldRotation(PlatformMesh->GetComponentRotation());
+	}
+	if (ensure(WaypointMeshArray[ArrayIndex])) WaypointMeshArray[ArrayIndex]->SetWorldScale3D(PlatformMesh->GetComponentScale());
+
 
 }
 
@@ -182,8 +190,57 @@ void AMovingPlatform::UpdatePlatformRotation()
 	PlatformMesh->SetWorldRotation(NextRotation);
 }
 
+void AMovingPlatform::ValidateStartPoint()
+{
+	int min = 0;
+	int max = Spline->GetNumberOfSplinePoints();
+
+	if		(StartPoint < min) StartPoint = min;
+	else if (StartPoint > max) StartPoint = max;
+}
+
+void AMovingPlatform::UpdatePlatformStartPosition()
+{
+	int max = WaypointMeshArray.Num();
+	bool CurrentWaypointWithinBounds = CurrentPoint <= max && CurrentPoint >= 0;
+	bool StartWaypointWithinBounds = StartPoint <= max && StartPoint >= 0;
+
+	if (CurrentWaypointWithinBounds)
+	{
+		if (ensure(WaypointMeshArray[CurrentPoint]))
+		{
+			if (StartWaypointWithinBounds)
+			{
+				if (ensure(WaypointMeshArray[StartPoint]))
+				{
+					if (CurrentPoint != StartPoint)
+					{
+						WaypointMeshArray[CurrentPoint]->SetVisibility(true);
+						WaypointMeshArray[StartPoint]->SetVisibility(false);
+						CurrentPoint = StartPoint;
+					}
+				}
+			}
+
+			if (ensure(PlatformMesh))
+			{
+				PlatformMesh->SetWorldLocation(WaypointMeshArray[CurrentPoint]->GetComponentLocation());
+				PlatformMesh->SetWorldRotation(WaypointMeshArray[CurrentPoint]->GetComponentRotation());
+			}
+
+			if (WaypointMeshArray[CurrentPoint]->IsVisible())
+			{
+				WaypointMeshArray[CurrentPoint]->SetVisibility(false);
+			}
+		}
+	}
+}
+
 void AMovingPlatform::OnConstruction(const FTransform& Transform)
 {
+	ValidateStartPoint();
+	UpdatePlatformStartPosition();
+
 	if (ensure(Spline))
 	{
 		UpdateWaypointArray();
@@ -198,22 +255,7 @@ void AMovingPlatform::OnConstruction(const FTransform& Transform)
 			}
 		}
 	}
-
-	if (WaypointMeshArray.Num() >= CurrentPoint)
-	{
-
-		if (ensure(WaypointMeshArray[CurrentPoint]))
-		{
-
-			if (ensure(PlatformMesh))
-			{
-				PlatformMesh->SetWorldLocation(WaypointMeshArray[CurrentPoint]->GetComponentLocation());
-				PlatformMesh->SetWorldRotation(WaypointMeshArray[CurrentPoint]->GetComponentRotation());
-			}
-		}
-	}
 }
-
 
 // Called every frame
 void AMovingPlatform::Tick(float DeltaTime)
