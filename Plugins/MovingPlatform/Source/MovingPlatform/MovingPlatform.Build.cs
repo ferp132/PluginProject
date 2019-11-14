@@ -40,7 +40,8 @@ public class MovingPlatform : ModuleRules
                 "SlateCore",
                 "UnrealEd",
                 "Blutility",
-                "UMG"
+                "UMG",
+                "UMGEditor"
 				// ... add private dependencies that you statically link with here ...	
 			}
 			);
